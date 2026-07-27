@@ -1,0 +1,1031 @@
+<!-- NSBE House Sorter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0F1B2D;
+    --bg-grid:#16263E;
+    --panel:#142235;
+    --panel-border:#23344B;
+    --ink:#EAF0F7;
+    --ink-dim:#8FA3BC;
+    --gold:#E8B649;
+
+    --h0:#E84545; /* Jemison - Red */
+    --h0-dim:#6B1818;
+    --h1:#D0D0D0; /* Johnson - Black */
+    --h1-dim:#1A1A1A;
+    --h2:#E8C832; /* Dean - Yellow */
+    --h2-dim:#5A4A0A;
+    --h3:#4CC87A; /* Latimer - Green */
+    --h3-dim:#1A4F32;
+  }
+
+  *{box-sizing:border-box;}
+  .nsbe-root{
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px) 0 0 / 28px 28px,
+      var(--bg);
+    border-radius:16px;
+    padding:32px;
+    max-width:720px;
+    margin:0 auto;
+    min-height:560px;
+    position:relative;
+    overflow:hidden;
+  }
+  .nsbe-root::before{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(ellipse at top, rgba(232,182,73,0.08), transparent 60%);
+    pointer-events:none;
+  }
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:6px;
+  }
+  .screen{position:relative; z-index:1;}
+  .hidden{display:none !important;}
+
+  /* ---- circuit progress ---- */
+  .trace{display:flex; align-items:center; gap:4px; margin-bottom:28px;}
+  .trace-node{
+    width:11px; height:11px; border-radius:50%;
+    background:var(--panel-border); border:2px solid var(--panel-border);
+    flex-shrink:0; transition:all .3s;
+  }
+  .trace-node.done{background:var(--gold); border-color:var(--gold); box-shadow:0 0 8px rgba(232,182,73,.6);}
+  .trace-node.active{border-color:var(--gold); box-shadow:0 0 0 3px rgba(232,182,73,.15);}
+  .trace-line{flex:1; height:2px; background:var(--panel-border); position:relative; overflow:hidden;}
+  .trace-line.done::after{content:""; position:absolute; inset:0; background:var(--gold);}
+
+  /* ---- start screen ---- */
+  .start-card{text-align:center; padding:40px 20px;}
+  .start-card h1{font-size:28px; line-height:1.25; margin-bottom:10px;}
+  .start-card p{color:var(--ink-dim); font-size:15px; margin-bottom:28px; max-width:440px; margin-left:auto; margin-right:auto;}
+  input.name-input{
+    width:100%; max-width:320px;
+    background:var(--panel); border:1px solid var(--panel-border);
+    color:var(--ink); font-size:15px; padding:12px 14px;
+    border-radius:10px; margin-bottom:16px; font-family:inherit;
+  }
+  input.name-input:focus{outline:none; border-color:var(--gold);}
+  button{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px;
+    border:none; border-radius:10px; padding:13px 26px; cursor:pointer;
+    background:var(--gold); color:#1A1305; transition:transform .15s, box-shadow .15s;
+  }
+  button:hover{transform:translateY(-1px); box-shadow:0 6px 18px rgba(232,182,73,.25);}
+  button.ghost{
+    background:transparent; color:var(--ink-dim); border:1px solid var(--panel-border);
+    font-weight:500;
+  }
+  button.ghost:hover{box-shadow:none; color:var(--ink); border-color:var(--ink-dim);}
+  button:disabled{opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none;}
+
+  /* ---- quiz ---- */
+  .q-label{font-size:18px; font-weight:600; margin-bottom:18px; line-height:1.4;}
+  .opts{display:grid; gap:10px;}
+  .opt{
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:10px; padding:14px 16px; cursor:pointer;
+    font-size:14.5px; text-align:left; transition:border-color .15s, background .15s;
+    color:var(--ink);
+  }
+  .opt:hover{border-color:var(--gold); background:#182740;}
+
+  /* ---- result ---- */
+  .result-wrap{text-align:center; padding:20px 10px;}
+  .house-badge{
+    width:84px; height:84px; border-radius:18px; margin:0 auto 18px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:34px; box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  .result-wrap .eyebrow{justify-content:center; display:flex;}
+  .result-wrap h1{font-size:26px; margin-bottom:6px;}
+  .result-wrap .figure-tag{font-size:13px; color:var(--ink-dim); margin-bottom:18px; font-family:'IBM Plex Mono',monospace;}
+  .result-wrap .blurb{font-size:14.5px; color:var(--ink-dim); max-width:440px; margin:0 auto 26px; line-height:1.6;}
+  .actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+
+  /* ---- houses overview ---- */
+  .house-row{
+    display:flex; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:12px; padding:14px 16px; margin-bottom:10px;
+  }
+  .house-swatch{width:36px; height:36px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:16px;}
+  .house-row-info{flex:1; min-width:0;}
+  .house-row-info .name{font-weight:600; font-size:14.5px;}
+  .house-row-info .sub{font-size:12px; color:var(--ink-dim); font-family:'IBM Plex Mono',monospace;}
+  .bar-track{height:6px; background:var(--bg-grid); border-radius:4px; margin-top:6px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px; transition:width .5s;}
+  .count-num{font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:500; min-width:34px; text-align:right;}
+
+  .top-bar{display:flex; justify-content:space-between; align-items:center; margin-bottom:22px;}
+  .top-bar .eyebrow{margin-bottom:0;}
+  .link-btn{
+    background:none; border:none; color:var(--ink-dim); font-size:12.5px;
+    font-family:'IBM Plex Mono',monospace; cursor:pointer; padding:4px 0;
+    text-decoration:underline; text-decoration-color:var(--panel-border);
+  }
+  .link-btn:hover{color:var(--gold);}
+
+  .empty-note{color:var(--ink-dim); font-size:13px; text-align:center; padding:20px 0;}
+  .loading-note{color:var(--ink-dim); font-size:13px; text-align:center; padding:40px 0; font-family:'IBM Plex Mono',monospace;}
+
+  .field-error{color:#E8836B; font-size:12.5px; margin:-8px auto 14px; min-height:14px; max-width:320px;}
+  .nav-row{display:flex; gap:18px; justify-content:center; margin-top:18px; flex-wrap:wrap;}
+  .crown{margin-left:6px; font-size:12px;}
+  .admin-box{margin-top:22px; padding:16px; border:1px dashed var(--panel-border); border-radius:12px;}
+  .admin-box h3{font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-dim); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.1em;}
+  .admin-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center;}
+  select.admin-input, input.admin-input{
+    background:var(--panel); border:1px solid var(--panel-border); color:var(--ink);
+    padding:10px 12px; border-radius:8px; font-family:inherit; font-size:13.5px;
+  }
+  select.admin-input:focus, input.admin-input:focus{outline:none; border-color:var(--gold);}
+  .admin-msg{font-size:12.5px; font-family:'IBM Plex Mono',monospace; min-height:16px;}
+  .admin-msg.ok{color:#7BC97E;}
+  .admin-msg.err{color:#E8836B;}
+  .log-entry{font-size:12px; color:var(--ink-dim); font-family:'IBM Plex Mono',monospace; padding:6px 0; border-top:1px solid var(--panel-border);}
+
+  .desc-card{
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:14px;
+    padding:18px; margin-bottom:14px; display:flex; gap:14px;
+  }
+  .desc-card .swatch{
+    width:48px; height:48px; border-radius:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+  }
+  .desc-card .body{flex:1; min-width:0;}
+  .desc-card .name{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;}
+  .desc-card .element{font-size:11.5px; color:var(--ink-dim); font-family:'IBM Plex Mono',monospace; margin-bottom:8px;}
+  .desc-card .figure{font-size:12px; color:var(--ink-dim); margin-bottom:6px;}
+  .desc-card .blurb{font-size:13.5px; color:var(--ink); line-height:1.55; margin-bottom:6px;}
+  .desc-card .motto{font-size:12.5px; color:var(--gold);}
+</style>
+
+<div class="nsbe-root" id="nsbeRoot">
+
+  <!-- START -->
+  <div class="screen" id="screen-start">
+    <div class="start-card">
+      <div class="eyebrow" style="justify-content:center;display:flex;">NSBE House Sort</div>
+      <h1>Find your house.</h1>
+      <p>Answer a few quick questions. We'll mix in your vibe with a bit of randomness and keep the four houses even — so you might land somewhere unexpected.</p>
+      <input class="name-input" id="nameInput" placeholder="First and last name" maxlength="60" />
+      <div class="field-error" id="nameError"></div>
+      <div><button id="btnStart">Start sorting</button></div>
+      <div class="nav-row">
+        <button class="link-btn" id="btnViewHousesFromStart">View current houses →</button>
+        <button class="link-btn" id="btnViewPointsFromStart">View house points →</button>
+        <button class="link-btn" id="btnViewDescriptions">House descriptions →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIZ -->
+  <div class="screen hidden" id="screen-quiz">
+    <div class="trace" id="trace"></div>
+    <div class="q-label" id="qLabel"></div>
+    <div class="opts" id="qOpts"></div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="screen hidden" id="screen-result">
+    <div class="result-wrap">
+      <div class="eyebrow">Sorted into</div>
+      <div class="house-badge" id="resBadge"></div>
+      <h1 id="resName"></h1>
+      <div class="figure-tag" id="resElement" style="margin-bottom:2px;"></div>
+      <div class="figure-tag" id="resFigure"></div>
+      <div class="figure-tag" id="resMotto" style="color:var(--gold); letter-spacing:0.04em; margin-top:6px;"></div>
+      <div class="blurb" id="resBlurb"></div>
+      <div class="actions">
+        <button id="btnViewHousesFromResult">View all houses</button>
+        <button class="ghost" id="btnSortAnother">Sort someone else</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOUSES OVERVIEW -->
+  <div class="screen hidden" id="screen-houses">
+    <div class="top-bar">
+      <div class="eyebrow">Current standings</div>
+      <button class="link-btn" id="btnBackHome">← back</button>
+    </div>
+    <div id="housesList"></div>
+    <div style="text-align:center; margin-top:6px;">
+      <button class="link-btn" id="btnGoPointsFromHouses">View house points →</button>
+    </div>
+  </div>
+
+  <!-- HOUSE DESCRIPTIONS -->
+  <div class="screen hidden" id="screen-descriptions">
+    <div class="top-bar">
+      <div class="eyebrow">The four houses</div>
+      <button class="link-btn" id="btnBackFromDescriptions">← back</button>
+    </div>
+    <div id="descriptionsList"></div>
+  </div>
+
+  <!-- POINTS (public) -->
+  <div class="screen hidden" id="screen-points">
+    <div class="top-bar">
+      <div class="eyebrow">House points</div>
+      <button class="link-btn" id="btnBackHomeFromPoints">← back</button>
+    </div>
+    <div id="pointsList"></div>
+    <h3 style="font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.1em; margin:22px 0 8px;">Recent activity</h3>
+    <div id="pointsLog"></div>
+    <div style="text-align:center; margin-top:18px;">
+      <button class="link-btn" id="btnGoAdminLogin">Admin →</button>
+    </div>
+  </div>
+
+  <!-- POINTS ADMIN LOGIN -->
+  <div class="screen hidden" id="screen-points-login">
+    <div class="top-bar">
+      <div class="eyebrow">Admin login</div>
+      <button class="link-btn" id="btnBackFromLogin">← back</button>
+    </div>
+    <div class="admin-box" style="margin-top:0;">
+      <h3>Log in to add house points</h3>
+      <div class="admin-row">
+        <input class="admin-input" id="loginUsername" placeholder="Your name" style="flex:1; min-width:160px;" />
+      </div>
+      <div class="admin-row">
+        <input class="admin-input" id="loginPasscode" type="password" placeholder="Admin passcode" style="flex:1; min-width:160px;" />
+      </div>
+      <div class="admin-row">
+        <button id="btnDoLogin">Log in</button>
+      </div>
+      <div class="admin-msg" id="loginMsg"></div>
+    </div>
+  </div>
+
+  <!-- POINTS ADMIN PANEL -->
+  <div class="screen hidden" id="screen-points-admin">
+    <div class="top-bar">
+      <div class="eyebrow">Log points</div>
+      <button class="link-btn" id="btnLogOut">log out</button>
+    </div>
+    <div class="admin-msg" id="adminWhoami" style="margin-bottom:14px;"></div>
+
+    <div class="admin-box" style="margin-top:0;">
+      <div class="admin-row">
+        <select class="admin-input" id="pointsHouseSelect"></select>
+        <input class="admin-input" id="pointsAmount" type="number" placeholder="Points (e.g. 10 or -5)" style="width:170px;" />
+      </div>
+      <div class="admin-row">
+        <input class="admin-input" id="pointsReason" placeholder="Reason (optional, e.g. GBM attendance)" style="flex:1; min-width:180px;" />
+      </div>
+      <div class="admin-row">
+        <button id="btnApplyPoints">Apply</button>
+      </div>
+      <div class="admin-msg" id="pointsMsg"></div>
+    </div>
+
+    <h3 style="font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.1em; margin:22px 0 8px;">Recent activity</h3>
+    <div id="adminPointsLog"></div>
+
+    <h3 style="font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.1em; margin:22px 0 8px;">Manage roster</h3>
+
+    <div class="admin-box" style="margin-top:0;">
+      <h3>Add a member manually</h3>
+      <div class="admin-row">
+        <input class="admin-input" id="addMemberName" placeholder="First and last name" style="flex:1; min-width:160px;" />
+        <select class="admin-input" id="addMemberGrade">
+          <option value="Freshman">Freshman</option>
+          <option value="Sophomore">Sophomore</option>
+          <option value="Junior">Junior</option>
+          <option value="Senior">Senior</option>
+        </select>
+      </div>
+      <div class="admin-row">
+        <select class="admin-input" id="addMemberHouse"></select>
+        <button id="btnAddMember">Add</button>
+      </div>
+      <div class="admin-msg" id="addMemberMsg"></div>
+    </div>
+
+    <div class="admin-box">
+      <h3>Remove a member</h3>
+      <div class="admin-row">
+        <select class="admin-input" id="removeMemberHouse" style="flex:1;"></select>
+      </div>
+      <div class="admin-row">
+        <select class="admin-input" id="removeMemberPerson" style="flex:1;"></select>
+        <button class="ghost" id="btnRemoveMember">Remove</button>
+      </div>
+      <div class="admin-msg" id="removeMemberMsg"></div>
+    </div>
+
+    <div class="admin-box">
+      <h3>Move a member to a different house</h3>
+      <div class="admin-row">
+        <select class="admin-input" id="moveMemberHouse" style="flex:1;"></select>
+      </div>
+      <div class="admin-row">
+        <select class="admin-input" id="moveMemberPerson" style="flex:1;"></select>
+      </div>
+      <div class="admin-row">
+        <select class="admin-input" id="moveMemberTarget" style="flex:1;"></select>
+        <button id="btnMoveMember">Move</button>
+      </div>
+      <div class="admin-msg" id="moveMemberMsg"></div>
+    </div>
+
+    <h3 style="font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.1em; margin:22px 0 8px;">Login history</h3>
+    <div id="loginHistory"></div>
+
+    <div class="admin-box">
+      <h3>Danger zone</h3>
+      <div class="admin-row">
+        <button class="ghost" id="btnReset">Reset all roster data</button>
+      </div>
+      <div class="admin-msg" id="resetMsg"></div>
+    </div>
+  </div>
+
+
+  <div class="screen hidden" id="screen-loading">
+    <div class="loading-note">loading roster…</div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // ---------------------------------------------------------------
+  // EDIT HERE: house identities. Swap names/figures/colors/icons freely.
+  // Index order must stay 0,1,2,3 — quiz options below map to these indices.
+  // ---------------------------------------------------------------
+  const HOUSES = [
+    {
+      key: 'jemison', name: 'Jemison House', element: 'Air · The Explorers',
+      figure: 'Mae Jemison · Astronaut, Engineer, Physician',
+      motto: 'Beyond What Is Known',
+      history: 'Mae C. Jemison became the first Black woman to travel to space when she flew aboard the Space Shuttle Endeavour in 1992. Before NASA, she earned a degree in chemical engineering from Stanford and a medical degree from Cornell, and served as a Peace Corps medical officer in West Africa. After leaving NASA she founded a technology research company and has spent decades working to make science accessible to everyone.',
+      color: 'var(--h0)', dim: 'var(--h0-dim)', icon: '✦'
+    },
+    {
+      key: 'johnson', name: 'Johnson House', element: 'Earth · The Strategists',
+      figure: 'Katherine Johnson · Mathematician, NASA',
+      motto: 'Precision Creates Possibility',
+      history: 'Katherine Johnson was a mathematician whose orbital mechanics calculations were critical to the success of the first U.S. crewed spaceflights. NASA astronaut John Glenn refused to fly unless Johnson personally verified the computer\'s numbers before his 1962 orbit of Earth. She worked at NASA for 33 years, contributing to the Apollo moon landing and the Space Shuttle program. Her story was brought to wide public attention by the 2016 film Hidden Figures.',
+      color: 'var(--h1)', dim: 'var(--h1-dim)', icon: '⛰'
+    },
+    {
+      key: 'dean', name: 'Dean House', element: 'Fire · The Builders',
+      figure: 'Mark Dean · Computer Scientist, co-inventor of the IBM PC',
+      motto: 'Create What Comes Next',
+      history: 'Mark Dean is a computer scientist and engineer who co-invented the IBM personal computer in 1981, holding three of the original nine PC patents. He later led the team that created the first gigahertz chip. Dean earned his PhD in electrical engineering from Stanford and became the first Black person to be named an IBM Fellow — the company\'s highest technical honor. He has said his greatest goal is to inspire the next generation of innovators.',
+      color: 'var(--h2)', dim: 'var(--h2-dim)', icon: '⚡'
+    },
+    {
+      key: 'latimer', name: 'Latimer House', element: 'Water · The Connectors',
+      figure: 'Lewis Latimer · Inventor & Engineer',
+      motto: 'Lift As We Rise',
+      history: 'Lewis Latimer was a self-taught inventor and engineer born in 1848 to formerly enslaved parents. He invented an improved carbon filament that made Thomas Edison\'s lightbulb practical and long-lasting, and personally supervised the installation of electric lighting in cities including New York, Philadelphia, and London. He was the only Black member of the elite group of inventors known as the Edison Pioneers, and later wrote the first textbook on electric lighting.',
+      color: 'var(--h3)', dim: 'var(--h3-dim)', icon: '≋'
+    }
+  ];
+
+  // Each house-type question's options map 1:1 to HOUSES[0..3] by position.
+  // The grade question is separate — it doesn't score toward a house, it's
+  // recorded so the sorter can keep grade levels spread across houses.
+  const QUESTIONS = [
+    {
+      type: 'grade',
+      label: "What year are you?",
+      opts: ["Freshman", "Sophomore", "Junior", "Senior"]
+    },
+    {
+      label: "A new opportunity shows up out of nowhere. You:",
+      opts: ["Say yes before you've thought it through", "Ask what the plan and timeline look like", "Ask if you can build or prototype something for it", "Ask who else is coming and who it'll help"]
+    },
+    {
+      label: "Pick a vibe for game night:",
+      opts: ["Something new none of you have played", "Strategy games & puzzles", "Building/Lego-style games", "Big group party games, everyone included"]
+    },
+    {
+      label: "Where do you study best?",
+      opts: ["Somewhere new, change of scenery", "Quiet corner, graph paper out", "Workshop or makerspace energy", "Coffee shop buzz, friends around"]
+    },
+    {
+      label: "Pick a weekend plan:",
+      opts: ["Go somewhere you've never been", "Work through a hard problem for fun", "Take something apart and rebuild it", "Organize a meetup or help someone out"]
+    },
+    {
+      label: "What's most satisfying to hear about your work?",
+      opts: ["\"I didn't think that was possible.\"", "\"That was exactly right, on time.\"", "\"You actually built that?\"", "\"That genuinely helped me.\""]
+    }
+  ];
+
+  const ROSTER_KEY = 'nsbe-house-roster-v1';
+  const POINTS_KEY = 'nsbe-house-points-v1';
+  const LOGIN_LOG_KEY = 'nsbe-admin-login-log-v1';
+
+  // ---- EDIT HERE: your Firebase config ----
+  const FB = 'https://nsbe-houses-default-rtdb.firebaseio.com';
+
+  // EDIT HERE: this name can sort as many times as you want, for testing/demo purposes.
+  const ADMIN_BYPASS_NAME = 'test testerson';
+
+  // EDIT HERE: passcode required to log in to the admin panel.
+  const ADMIN_PASSCODE = 'Nsbe#House9!';
+
+  // EDIT HERE: only these names (case-insensitive) are allowed to log in as admin.
+  const ADMIN_ALLOWED_NAMES = [
+    'admin67'
+  ];
+
+  let scores = [0,0,0,0];
+  let qIndex = 0;
+  let currentName = '';
+  let currentGrade = '';
+
+  const el = id => document.getElementById(id);
+
+  // ---- Firebase helpers ----
+  async function fbGet(path){
+    try{
+      const res = await fetch(`${FB}/${path}.json`);
+      if(!res.ok) return null;
+      return await res.json();
+    }catch(e){ console.error('fbGet failed', e); return null; }
+  }
+  async function fbSet(path, data){
+    try{
+      const res = await fetch(`${FB}/${path}.json`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      return res.ok;
+    }catch(e){ console.error('fbSet failed', e); return false; }
+  }
+  async function fbPush(path, data){
+    try{
+      const res = await fetch(`${FB}/${path}.json`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+      return res.ok;
+    }catch(e){ console.error('fbPush failed', e); return false; }
+  }
+
+  // ---- roster ----
+  async function getRoster(){
+    const data = await fbGet('roster');
+    if(data){
+      HOUSES.forEach(h => {
+        if(!data[h.key]) data[h.key] = [];
+        else if(!Array.isArray(data[h.key])){
+          // Firebase converts arrays to objects — convert back
+          data[h.key] = Object.values(data[h.key]);
+        }
+      });
+      return data;
+    }
+    const empty = {};
+    HOUSES.forEach(h => empty[h.key] = []);
+    return empty;
+  }
+  async function saveRoster(roster){
+    await fbSet('roster', roster);
+  }
+
+  // ---- points ----
+  async function getPoints(){
+    const data = await fbGet('points');
+    if(data){
+      if(!data.totals){ data.totals = {}; }
+      if(!data.log){ data.log = []; }
+      else if(!Array.isArray(data.log)){
+        // Firebase converts arrays to objects — convert back
+        data.log = Object.values(data.log).sort((a,b) => a.ts - b.ts);
+      }
+      HOUSES.forEach(h => { if(data.totals[h.key] === undefined) data.totals[h.key] = 0; });
+      return data;
+    }
+    const totals = {};
+    HOUSES.forEach(h => totals[h.key] = 0);
+    return {totals, log: []};
+  }
+  async function savePoints(data){
+    await fbSet('points', data);
+  }
+
+  // ---- login log ----
+  async function getLoginLog(){
+    const data = await fbGet('loginLog');
+    if(!data) return [];
+    // Firebase stores pushed items as an object with auto keys — convert to array
+    return Object.values(data).sort((a,b) => a.ts - b.ts);
+  }
+  async function recordLoginAttempt(name, success, reason){
+    await fbPush('loginLog', {name: name || '(blank)', success, reason: reason || '', ts: Date.now()});
+  }
+
+  function normalizeName(raw){
+    return raw.trim().replace(/\s+/g, ' ');
+  }
+  function isFullName(name){
+    return name.split(' ').filter(Boolean).length >= 2;
+  }
+  function isAdminBypass(name){
+    return name.toLowerCase() === ADMIN_BYPASS_NAME.toLowerCase();
+  }
+  function isAllowedAdmin(name){
+    return ADMIN_ALLOWED_NAMES.some(n => n.toLowerCase() === name.toLowerCase());
+  }
+  function findExistingHouse(roster, name){
+    const lower = name.toLowerCase();
+    for(const h of HOUSES){
+      const members = roster[h.key] || [];
+      if(members.some(m => (m.name || '').toLowerCase() === lower)) return h;
+    }
+    return null;
+  }
+  const GRADE_ABBR = {Freshman: 'Fr', Sophomore: 'So', Junior: 'Jr', Senior: 'Sr'};
+  const show = id => { ['screen-start','screen-quiz','screen-result','screen-houses','screen-descriptions','screen-points','screen-points-login','screen-points-admin','screen-loading'].forEach(s => el(s).classList.add('hidden')); el(id).classList.remove('hidden'); };
+
+  let adminUsername = '';
+
+  // ---- quiz flow ----
+  function renderTrace(){
+    const t = el('trace');
+    t.innerHTML = '';
+    QUESTIONS.forEach((_, i) => {
+      const node = document.createElement('div');
+      node.className = 'trace-node' + (i < qIndex ? ' done' : i === qIndex ? ' active' : '');
+      t.appendChild(node);
+      if(i < QUESTIONS.length - 1){
+        const line = document.createElement('div');
+        line.className = 'trace-line' + (i < qIndex ? ' done' : '');
+        t.appendChild(line);
+      }
+    });
+  }
+
+  function advanceQuiz(){
+    qIndex++;
+    if(qIndex < QUESTIONS.length){
+      renderQuestion();
+    }else{
+      finishQuiz();
+    }
+  }
+
+  function renderQuestion(){
+    renderTrace();
+    const q = QUESTIONS[qIndex];
+    el('qLabel').textContent = q.label;
+    const optsWrap = el('qOpts');
+    optsWrap.innerHTML = '';
+
+    if(q.type === 'grade'){
+      q.opts.forEach(text => {
+        const btn = document.createElement('div');
+        btn.className = 'opt';
+        btn.textContent = text;
+        btn.onclick = () => { currentGrade = text; advanceQuiz(); };
+        optsWrap.appendChild(btn);
+      });
+      return;
+    }
+
+    // shuffle display order but keep house-index mapping attached to each option
+    const indexed = q.opts.map((text, houseIdx) => ({text, houseIdx}));
+    for(let i = indexed.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i+1));
+      [indexed[i], indexed[j]] = [indexed[j], indexed[i]];
+    }
+    indexed.forEach(opt => {
+      const btn = document.createElement('div');
+      btn.className = 'opt';
+      btn.textContent = opt.text;
+      btn.onclick = () => {
+        scores[opt.houseIdx] += 1;
+        advanceQuiz();
+      };
+      optsWrap.appendChild(btn);
+    });
+  }
+
+  async function finishQuiz(){
+    show('screen-loading');
+    // small random jitter so identical answers don't always land identically
+    const jittered = scores.map(s => s + Math.random() * 0.9);
+    const ranked = jittered.map((s,i) => ({i, s})).sort((a,b) => b.s - a.s);
+    const topTwo = [ranked[0].i, ranked[1].i];
+
+    const roster = await getRoster();
+    const counts = HOUSES.map(h => (roster[h.key] || []).length);
+    const gradeCounts = HOUSES.map(h => (roster[h.key] || []).filter(m => m.grade === currentGrade).length);
+
+    // prefer the house with fewer total members; if close, also factor in
+    // how many people of the same grade are already in that house, so grade
+    // levels stay spread out instead of stacking up in one house.
+    const weight = i => counts[i] * 3 + gradeCounts[i];
+    let chosen;
+    const wA = weight(topTwo[0]), wB = weight(topTwo[1]);
+    if(wA < wB) chosen = topTwo[0];
+    else if(wB < wA) chosen = topTwo[1];
+    else chosen = topTwo[Math.random() < 0.5 ? 0 : 1];
+
+    roster[HOUSES[chosen].key] = roster[HOUSES[chosen].key] || [];
+    roster[HOUSES[chosen].key].push({name: currentName || 'New member', grade: currentGrade || 'Unspecified'});
+    await saveRoster(roster);
+
+    showResult(chosen);
+  }
+
+  function showResult(houseIdx){
+    const h = HOUSES[houseIdx];
+    el('resBadge').style.background = h.dim;
+    el('resBadge').style.color = h.color;
+    el('resBadge').textContent = h.icon;
+    el('resName').textContent = h.name;
+    el('resElement').textContent = h.element;
+    el('resFigure').textContent = h.figure;
+    el('resMotto').textContent = '“' + h.motto + '”';
+    el('resBlurb').textContent = h.history;
+    show('screen-result');
+  }
+
+  async function renderHouses(){
+    show('screen-loading');
+    const roster = await getRoster();
+    const wrap = el('housesList');
+    wrap.innerHTML = '';
+    const total = HOUSES.reduce((sum,h) => sum + (roster[h.key]||[]).length, 0) || 1;
+    HOUSES.forEach(h => {
+      const members = roster[h.key] || [];
+      const breakdown = ['Freshman','Sophomore','Junior','Senior']
+        .map(g => `${GRADE_ABBR[g]} ${members.filter(m => m.grade === g).length}`)
+        .join(' · ');
+      const row = document.createElement('div');
+      row.className = 'house-row';
+      row.innerHTML = `
+        <div class="house-swatch" style="background:${h.dim};color:${h.color}">${h.icon}</div>
+        <div class="house-row-info">
+          <div class="name">${h.name} <span style="color:var(--ink-dim); font-weight:400;">— ${h.element}</span></div>
+          <div class="sub">${members.length} member${members.length===1?'':'s'} · "${h.motto}"</div>
+          <div class="sub" style="margin-top:2px;">${breakdown}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(members.length/total*100)}%; background:${h.color}"></div></div>
+        </div>
+        <div class="count-num">${members.length}</div>
+      `;
+      wrap.appendChild(row);
+    });
+    if(total === 0 || total === 1 && HOUSES.every(h => (roster[h.key]||[]).length === 0)){
+      const note = document.createElement('div');
+      note.className = 'empty-note';
+      note.textContent = 'No one sorted yet — be the first.';
+      wrap.appendChild(note);
+    }
+    show('screen-houses');
+  }
+
+  function renderDescriptions(){
+    const wrap = el('descriptionsList');
+    wrap.innerHTML = '';
+    HOUSES.forEach(h => {
+      const card = document.createElement('div');
+      card.className = 'desc-card';
+      card.innerHTML = `
+        <div class="swatch" style="background:${h.dim};color:${h.color}">${h.icon}</div>
+        <div class="body">
+          <div class="name">${h.name}</div>
+          <div class="figure">${h.figure}</div>
+          <div class="blurb">${h.history}</div>
+        </div>
+      `;
+      wrap.appendChild(card);
+    });
+    show('screen-descriptions');
+  }
+
+  function renderLogEntries(containerId, data, limit){
+    const logWrap = el(containerId);
+    logWrap.innerHTML = '';
+    const entries = data.log.slice(-limit).reverse();
+    if(entries.length === 0){
+      const note = document.createElement('div');
+      note.className = 'log-entry';
+      note.style.borderTop = 'none';
+      note.textContent = 'No points logged yet.';
+      logWrap.appendChild(note);
+      return;
+    }
+    entries.forEach(entry => {
+      const houseObj = HOUSES.find(h => h.key === entry.house);
+      const line = document.createElement('div');
+      line.className = 'log-entry';
+      const sign = entry.points > 0 ? '+' : '';
+      line.textContent = `${sign}${entry.points} → ${houseObj ? houseObj.name : entry.house}${entry.reason ? ' — ' + entry.reason : ''}${entry.by ? ' (by ' + entry.by + ')' : ''}`;
+      logWrap.appendChild(line);
+    });
+  }
+
+  async function renderPoints(){
+    show('screen-loading');
+    const data = await getPoints();
+    const wrap = el('pointsList');
+    wrap.innerHTML = '';
+
+    const ranked = HOUSES.map(h => ({h, pts: data.totals[h.key] || 0})).sort((a,b) => b.pts - a.pts);
+    ranked.forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'house-row';
+      row.innerHTML = `
+        <div class="house-swatch" style="background:${entry.h.dim};color:${entry.h.color}">${entry.h.icon}</div>
+        <div class="house-row-info">
+          <div class="name">${entry.h.name}${i===0 && entry.pts>0 ? '<span class="crown">👑 leading</span>' : ''}</div>
+          <div class="sub">${entry.h.element}</div>
+        </div>
+        <div class="count-num">${entry.pts}</div>
+      `;
+      wrap.appendChild(row);
+    });
+
+    renderLogEntries('pointsLog', data, 8);
+    show('screen-points');
+  }
+
+  function renderLoginHistory(log){
+    const wrap = el('loginHistory');
+    wrap.innerHTML = '';
+    const entries = log.slice(-10).reverse();
+    if(entries.length === 0){
+      const note = document.createElement('div');
+      note.className = 'log-entry';
+      note.style.borderTop = 'none';
+      note.textContent = 'No login attempts yet.';
+      wrap.appendChild(note);
+      return;
+    }
+    entries.forEach(entry => {
+      const line = document.createElement('div');
+      line.className = 'log-entry';
+      const when = new Date(entry.ts).toLocaleString();
+      const mark = entry.success ? '✓' : '✕';
+      line.textContent = `${mark} ${entry.name} — ${when}${entry.reason ? ' (' + entry.reason + ')' : ''}`;
+      wrap.appendChild(line);
+    });
+  }
+
+  function showAdminLogin(){
+    el('loginUsername').value = '';
+    el('loginPasscode').value = '';
+    el('loginMsg').textContent = '';
+    el('loginMsg').className = 'admin-msg';
+    show('screen-points-login');
+  }
+
+  async function attemptLogin(){
+    const msgEl = el('loginMsg');
+    const username = normalizeName(el('loginUsername').value);
+    const passcode = el('loginPasscode').value.trim();
+
+    if(!username){
+      msgEl.textContent = 'Enter your name.';
+      msgEl.className = 'admin-msg err';
+      return;
+    }
+    if(!isAllowedAdmin(username)){
+      await recordLoginAttempt(username, false, 'name not on admin list');
+      msgEl.textContent = 'That name is not authorized for admin access.';
+      msgEl.className = 'admin-msg err';
+      return;
+    }
+    if(passcode !== ADMIN_PASSCODE){
+      await recordLoginAttempt(username, false, 'wrong passcode');
+      msgEl.textContent = 'Incorrect admin passcode.';
+      msgEl.className = 'admin-msg err';
+      return;
+    }
+    await recordLoginAttempt(username, true);
+    adminUsername = username;
+    await renderAdminPanel();
+  }
+
+  async function renderAdminPanel(){
+    show('screen-loading');
+    const data = await getPoints();
+    const loginLog = await getLoginLog();
+
+    el('adminWhoami').className = 'admin-msg ok';
+    el('adminWhoami').textContent = `Logged in as ${adminUsername}`;
+
+    const sel = el('pointsHouseSelect');
+    sel.innerHTML = HOUSES.map(h => `<option value="${h.key}">${h.name}</option>`).join('');
+
+    // populate add-member house select
+    el('addMemberHouse').innerHTML = HOUSES.map(h => `<option value="${h.key}">${h.name}</option>`).join('');
+
+    // populate remove/move dropdowns
+    await refreshRosterDropdowns();
+
+    el('pointsAmount').value = '';
+    el('pointsReason').value = '';
+    el('pointsMsg').textContent = '';
+    el('pointsMsg').className = 'admin-msg';
+    el('resetMsg').textContent = '';
+    el('resetMsg').className = 'admin-msg';
+    el('addMemberMsg').textContent = '';
+    el('removeMemberMsg').textContent = '';
+    el('moveMemberMsg').textContent = '';
+
+    renderLogEntries('adminPointsLog', data, 8);
+    renderLoginHistory(loginLog);
+    show('screen-points-admin');
+  }
+
+  async function refreshRosterDropdowns(){
+    const roster = await getRoster();
+    const removeHouseSel = el('removeMemberHouse');
+    removeHouseSel.innerHTML = HOUSES.map(h => `<option value="${h.key}">${h.name}</option>`).join('');
+    function refreshRemovePersons(){
+      const members = roster[removeHouseSel.value] || [];
+      el('removeMemberPerson').innerHTML = members.length
+        ? members.map((m,i) => `<option value="${i}">${m.name} (${m.grade})</option>`).join('')
+        : '<option value="">— no members —</option>';
+    }
+    removeHouseSel.onchange = () => { roster[removeHouseSel.value]; refreshRemovePersons(); };
+    refreshRemovePersons();
+    const moveHouseSel = el('moveMemberHouse');
+    moveHouseSel.innerHTML = HOUSES.map(h => `<option value="${h.key}">${h.name}</option>`).join('');
+    function refreshMovePersons(){
+      const members = roster[moveHouseSel.value] || [];
+      el('moveMemberPerson').innerHTML = members.length
+        ? members.map((m,i) => `<option value="${i}">${m.name} (${m.grade})</option>`).join('')
+        : '<option value="">— no members —</option>';
+    }
+    moveHouseSel.onchange = refreshMovePersons;
+    refreshMovePersons();
+    el('moveMemberTarget').innerHTML = HOUSES.map(h => `<option value="${h.key}">${h.name}</option>`).join('');
+  }
+
+  async function addMember(){
+    const msgEl = el('addMemberMsg');
+    const name = normalizeName(el('addMemberName').value);
+    const grade = el('addMemberGrade').value;
+    const houseKey = el('addMemberHouse').value;
+    if(!name){ msgEl.textContent = 'Enter a name.'; msgEl.className = 'admin-msg err'; return; }
+    if(!isFullName(name)){ msgEl.textContent = 'Enter first and last name.'; msgEl.className = 'admin-msg err'; return; }
+    const roster = await getRoster();
+    const existing = findExistingHouse(roster, name);
+    if(existing){ msgEl.textContent = `${name} is already in ${existing.name}.`; msgEl.className = 'admin-msg err'; return; }
+    roster[houseKey] = roster[houseKey] || [];
+    roster[houseKey].push({name, grade});
+    await saveRoster(roster);
+    el('addMemberName').value = '';
+    msgEl.textContent = `${name} added to ${HOUSES.find(h=>h.key===houseKey).name}.`;
+    msgEl.className = 'admin-msg ok';
+    await refreshRosterDropdowns();
+  }
+
+  async function removeMember(){
+    const msgEl = el('removeMemberMsg');
+    const houseKey = el('removeMemberHouse').value;
+    const idx = parseInt(el('removeMemberPerson').value, 10);
+    const roster = await getRoster();
+    const members = roster[houseKey] || [];
+    if(!members.length || isNaN(idx)){ msgEl.textContent = 'No member selected.'; msgEl.className = 'admin-msg err'; return; }
+    const removed = members.splice(idx, 1)[0];
+    roster[houseKey] = members;
+    await saveRoster(roster);
+    msgEl.textContent = `${removed.name} removed from ${HOUSES.find(h=>h.key===houseKey).name}.`;
+    msgEl.className = 'admin-msg ok';
+    await refreshRosterDropdowns();
+  }
+
+  async function moveMember(){
+    const msgEl = el('moveMemberMsg');
+    const fromKey = el('moveMemberHouse').value;
+    const idx = parseInt(el('moveMemberPerson').value, 10);
+    const toKey = el('moveMemberTarget').value;
+    if(fromKey === toKey){ msgEl.textContent = 'Choose a different target house.'; msgEl.className = 'admin-msg err'; return; }
+    const roster = await getRoster();
+    const fromMembers = roster[fromKey] || [];
+    if(!fromMembers.length || isNaN(idx)){ msgEl.textContent = 'No member selected.'; msgEl.className = 'admin-msg err'; return; }
+    const member = fromMembers.splice(idx, 1)[0];
+    roster[fromKey] = fromMembers;
+    roster[toKey] = roster[toKey] || [];
+    roster[toKey].push(member);
+    await saveRoster(roster);
+    msgEl.textContent = `${member.name} moved to ${HOUSES.find(h=>h.key===toKey).name}.`;
+    msgEl.className = 'admin-msg ok';
+    await refreshRosterDropdowns();
+  }
+
+  function logOut(){
+    adminUsername = '';
+    renderPoints();
+  }
+
+  async function applyPoints(){
+    const msgEl = el('pointsMsg');
+    const houseKey = el('pointsHouseSelect').value;
+    const amountRaw = el('pointsAmount').value.trim();
+    const reason = el('pointsReason').value.trim();
+
+    if(!adminUsername){
+      msgEl.textContent = 'You were logged out — please log in again.';
+      msgEl.className = 'admin-msg err';
+      showAdminLogin();
+      return;
+    }
+    const amount = parseInt(amountRaw, 10);
+    if(!amountRaw || isNaN(amount) || amount === 0){
+      msgEl.textContent = 'Enter a non-zero point amount.';
+      msgEl.className = 'admin-msg err';
+      return;
+    }
+
+    const data = await getPoints();
+    data.totals[houseKey] = (data.totals[houseKey] || 0) + amount;
+    data.log.push({house: houseKey, points: amount, reason, by: adminUsername, ts: Date.now()});
+    await savePoints(data);
+
+    el('pointsAmount').value = '';
+    el('pointsReason').value = '';
+    msgEl.textContent = 'Points logged.';
+    msgEl.className = 'admin-msg ok';
+    renderLogEntries('adminPointsLog', data, 8);
+  }
+
+  el('btnStart').onclick = async () => {
+    const raw = normalizeName(el('nameInput').value);
+    const errEl = el('nameError');
+    errEl.textContent = '';
+
+    if(!raw){
+      errEl.textContent = 'Enter your name to get sorted.';
+      return;
+    }
+    if(!isFullName(raw)){
+      errEl.textContent = 'Please enter your first and last name.';
+      return;
+    }
+    if(!isAdminBypass(raw)){
+      const roster = await getRoster();
+      const existing = findExistingHouse(roster, raw);
+      if(existing){
+        errEl.textContent = `${raw} has already been sorted — into ${existing.name}.`;
+        return;
+      }
+    }
+
+    currentName = raw;
+    currentGrade = '';
+    scores = [0,0,0,0];
+    qIndex = 0;
+    show('screen-quiz');
+    renderQuestion();
+  };
+  el('btnViewHousesFromStart').onclick = renderHouses;
+  el('btnViewHousesFromResult').onclick = renderHouses;
+  el('btnViewPointsFromStart').onclick = renderPoints;
+  el('btnViewDescriptions').onclick = renderDescriptions;
+  el('btnBackFromDescriptions').onclick = () => show('screen-start');
+  el('btnGoPointsFromHouses').onclick = renderPoints;
+  el('btnBackHomeFromPoints').onclick = () => show('screen-start');
+  el('btnGoAdminLogin').onclick = showAdminLogin;
+  el('btnBackFromLogin').onclick = renderPoints;
+  el('btnDoLogin').onclick = attemptLogin;
+  el('loginPasscode').addEventListener('keydown', e => { if(e.key === 'Enter') attemptLogin(); });
+  el('btnLogOut').onclick = logOut;
+  el('btnApplyPoints').onclick = applyPoints;
+  el('btnAddMember').onclick = addMember;
+  el('btnRemoveMember').onclick = removeMember;
+  el('btnMoveMember').onclick = moveMember;
+  el('btnBackHome').onclick = () => show('screen-start');
+  el('btnSortAnother').onclick = () => { el('nameInput').value=''; el('nameError').textContent=''; show('screen-start'); };
+  el('btnReset').onclick = async () => {
+    const msgEl = el('resetMsg');
+    if(confirm('This clears the entire shared roster for everyone. Are you sure?')){
+      const empty = {};
+      HOUSES.forEach(h => empty[h.key] = []);
+      await saveRoster(empty);
+      msgEl.textContent = 'Roster reset.';
+      msgEl.className = 'admin-msg ok';
+    }
+  };
+
+})();
+</script>
